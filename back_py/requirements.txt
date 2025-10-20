@@ -1,0 +1,12 @@
+selenium
+webdriver-manager
+# --- FastAPI & 서버 ---
+fastapi
+uvicorn
+
+# --- GPT API ---
+openai
+python-dotenv
+
+# --- 데이터 처리 ---
+pandas
