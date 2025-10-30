@@ -28,7 +28,7 @@ CONFIG = {
     "Cooler_Air": ("https://prod.danawa.com/list/?cate=11336857", 5),
 }
 
-KST = datetime.now() + timedelta(hours=9)
+KST = datetime.now()
 OUTPUT_CSV = f"./data/danawa{KST.strftime('%Y%m%d_%H%M%S')}.csv"
 
 
@@ -73,30 +73,33 @@ def append_rows_to_csv(path: str, rows: list[dict]):
                 [r.get(k, "") for k in ["id", "name", "price", "capacity", "link", "category", "spec","updated_at"]]
             )
 
+
 def clean_capacity(category: str, raw_text: str):
     """
     용량 문자열 정제:
-    - HDD의 괄호 뒤 모델명 제거
-    - RAM의 수량형, 벌크형, 세트형 항목 제거
+    - RAM: 수량형, 벌크, 세트 제외
+    - HDD: 괄호 속 모델명 제거 (WD40EZAZ 등)
+    - 나머지 부품: 괄호 포함 그대로 반환 (예: 48GB(24Gx2))
     """
     if not raw_text:
         return ""
 
     text = raw_text.strip()
 
-    # HDD: 괄호 안의 모델명 제거 (예: 4TB (WD40EZAZ) → 4TB)
-    text = re.sub(r"\s*\(.*?\)", "", text)
-
-    # RAM: 수량별/세트/벌크 등 제외
+    # RAM: 제외 단어 필터
     if category.upper().startswith("RAM"):
-        # 제외할 단어 목록
         skip_words = ["수량", "벌크", "세트", "패키지"]
         if any(word in text for word in skip_words):
             return ""
 
-    # 용량만 남기기 (예: 32GB, 1TB 등)
-    match = re.search(r"(\d+(?:\.\d+)?\s?(?:GB|TB))", text, re.IGNORECASE)
-    return match.group(1).upper().replace(" ", "") if match else ""
+    # HDD: 괄호 속 모델명 제거 (WD40EZAZ 등)
+    if category.upper().startswith("HDD"):
+        text = text.split(",")[0].strip()
+       
+    text = re.sub(r"\s+", " ", text).strip()
+
+    # 공백 정리
+    return text.strip()
 
 # -----------------------
 # 크롤링 로직
@@ -128,10 +131,10 @@ def parse_products(driver, category: str, url: str, max_pages: int):
                 except:
                     spec_text = ""
 
+                is_memeory_category = category.upper() in ["RAM", "SSD", "HDD"]
                 # ✅ 용량별 변형 상품 추출 (RAM, SSD, HDD 등)
-                variant_elems = item.find_elements(By.CSS_SELECTOR, "div.prod_pricelist ul li")
-
-                if variant_elems:
+                if is_memeory_category:
+                    variant_elems = item.find_elements(By.CSS_SELECTOR, "div.prod_pricelist ul li")
                     for v in variant_elems:
                         try:
                             raw_capacity = v.find_element(By.CSS_SELECTOR, "p.memory_sect span.text").text.strip()
@@ -140,7 +143,6 @@ def parse_products(driver, category: str, url: str, max_pages: int):
                         capacity = clean_capacity(category, raw_capacity)
                         if not capacity:
                             continue
-
                         try:
                             price_text = v.find_element(By.CSS_SELECTOR, "p.price_sect strong").text.strip()
                             price = int(price_text.replace(",", "").replace("원", ""))
