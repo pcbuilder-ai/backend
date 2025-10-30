@@ -1,7 +1,8 @@
 import time
 import csv
 import hashlib
-from datetime import datetime
+import re
+from datetime import datetime,timedelta
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -27,7 +28,8 @@ CONFIG = {
     "Cooler_Air": ("https://prod.danawa.com/list/?cate=11336857", 5),
 }
 
-OUTPUT_CSV = f"./data/danawa{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+KST = datetime.now() + timedelta(hours=9)
+OUTPUT_CSV = f"./data/danawa{KST.strftime('%Y%m%d_%H%M%S')}.csv"
 
 
 # -----------------------
@@ -55,7 +57,7 @@ def ensure_csv_header(path: str):
     import os
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    header = ["id", "name", "price", "link", "category", "spec", "updated_at"]
+    header = ["id", "name", "price","capacity", "link", "category", "spec", "updated_at"]
 
     if not os.path.exists(path):
         with open(path, "w", newline="", encoding="utf-8-sig") as f:
@@ -68,9 +70,33 @@ def append_rows_to_csv(path: str, rows: list[dict]):
         writer = csv.writer(f)
         for r in rows:
             writer.writerow(
-                [r.get(k, "") for k in ["id", "name", "price", "link", "category", "spec","updated_at"]]
+                [r.get(k, "") for k in ["id", "name", "price", "capacity", "link", "category", "spec","updated_at"]]
             )
 
+def clean_capacity(category: str, raw_text: str):
+    """
+    용량 문자열 정제:
+    - HDD의 괄호 뒤 모델명 제거
+    - RAM의 수량형, 벌크형, 세트형 항목 제거
+    """
+    if not raw_text:
+        return ""
+
+    text = raw_text.strip()
+
+    # HDD: 괄호 안의 모델명 제거 (예: 4TB (WD40EZAZ) → 4TB)
+    text = re.sub(r"\s*\(.*?\)", "", text)
+
+    # RAM: 수량별/세트/벌크 등 제외
+    if category.upper().startswith("RAM"):
+        # 제외할 단어 목록
+        skip_words = ["수량", "벌크", "세트", "패키지"]
+        if any(word in text for word in skip_words):
+            return ""
+
+    # 용량만 남기기 (예: 32GB, 1TB 등)
+    match = re.search(r"(\d+(?:\.\d+)?\s?(?:GB|TB))", text, re.IGNORECASE)
+    return match.group(1).upper().replace(" ", "") if match else ""
 
 # -----------------------
 # 크롤링 로직
@@ -81,7 +107,7 @@ def parse_products(driver, category: str, url: str, max_pages: int):
     for page in range(1, max_pages + 1):
         page_url = f"{url}&page={page}"
         driver.get(page_url)
-        time.sleep(2)  # 페이지 로딩 대기
+        time.sleep(2)
 
         items = driver.find_elements(
             By.CSS_SELECTOR, "div.main_prodlist > ul.product_list > li.prod_item"
@@ -93,42 +119,71 @@ def parse_products(driver, category: str, url: str, max_pages: int):
         for item in items:
             try:
                 name_el = item.find_element(By.CSS_SELECTOR, "p.prod_name a")
-                name = name_el.text.strip()
-                link = name_el.get_attribute("href")
+                base_name = name_el.text.strip()
 
+                # 스펙
                 try:
-                    price_el = item.find_element(By.CSS_SELECTOR, "p.price_sect strong")
-                    price_text = price_el.text.replace(",", "").replace("원", "").strip()
-                    price = int(price_text) if price_text.isdigit() else None
+                    spec_el = item.find_element(By.CLASS_NAME, "spec_list")
+                    spec_text = spec_el.get_attribute("textContent").strip()
                 except:
-                    price = None
+                    spec_text = ""
 
-                try:
-                    WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.CLASS_NAME, "spec_list"))
-                    )
-                    spec_element = item.find_element(By.CLASS_NAME, "spec_list")
+                # ✅ 용량별 변형 상품 추출 (RAM, SSD, HDD 등)
+                variant_elems = item.find_elements(By.CSS_SELECTOR, "div.prod_pricelist ul li")
 
-                    raw_spec = spec_element.get_attribute("textContent").strip()
-                    parts = [p.strip() for p in raw_spec.replace("\n", " | ").split("|") if p.strip()]
-                    unique_parts = list(dict.fromkeys(parts))  # 순서 유지 중복 제거
+                if variant_elems:
+                    for v in variant_elems:
+                        try:
+                            raw_capacity = v.find_element(By.CSS_SELECTOR, "p.memory_sect span.text").text.strip()
+                        except:
+                            raw_capacity = ""
+                        capacity = clean_capacity(category, raw_capacity)
+                        if not capacity:
+                            continue
 
-                    spec_final = " | ".join(unique_parts)
-                except Exception:
-                    spec_final = ""
+                        try:
+                            price_text = v.find_element(By.CSS_SELECTOR, "p.price_sect strong").text.strip()
+                            price = int(price_text.replace(",", "").replace("원", ""))
+                        except:
+                            price = None
 
+                        try:
+                            link = v.find_element(By.CSS_SELECTOR, "p.price_sect a").get_attribute("href")
+                        except:
+                            link = name_el.get_attribute("href")
 
-                results.append(
-                    {
+                        results.append({
+                            "id": stable_id_from_link(link),
+                            "name": f"{base_name} ({capacity})" if capacity else base_name,
+                            "price": price,
+                            "capacity": capacity,
+                            "link": link,
+                            "category": category,
+                            "spec": spec_text,
+                            "updated_at": datetime.now().isoformat(),
+                        })
+                else:
+                    # 일반 상품 (CPU 등)
+                    try:
+                        price_el = item.find_element(By.CSS_SELECTOR, "p.price_sect strong")
+                        price_text = price_el.text.replace(",", "").replace("원", "").strip()
+                        price = int(price_text) if price_text.isdigit() else None
+                    except:
+                        price = None
+
+                    link = name_el.get_attribute("href")
+
+                    results.append({
                         "id": stable_id_from_link(link),
-                        "name": name,
+                        "name": base_name,
                         "price": price,
+                        "capacity": "",
                         "link": link,
                         "category": category,
-                        "spec": spec_final,
+                        "spec": spec_text,
                         "updated_at": datetime.now().isoformat(),
-                    }
-                )
+                    })
+
             except Exception:
                 continue
 
