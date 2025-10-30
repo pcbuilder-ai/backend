@@ -7,22 +7,17 @@ services:
       - "8080:8080"
     depends_on:
       - db
-      - crawler
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/project?serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: 1234
+      - back_py
 
   back_py:
     build: ./back_py
+    container_name: back_py
     ports:
-      - "8000:8000"
+      - "8001:8000"  # FastAPI 외부 노출 포트
     volumes:
-      - ./back_py/data:/app/data
+      - ./back_py:/app
     environment:
-      DB_HOST: db
-      DB_USER: root
-      DB_PASS: 1234
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - db
 
@@ -31,6 +26,12 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: 1234
       MYSQL_DATABASE: project
+      TZ: Asia/Seoul
+    command: [
+      "--character-set-server=utf8mb4",
+      "--collation-server=utf8mb4_unicode_ci",
+      "--character-set-client-handshake=FALSE"
+    ]
     ports:
       - "3306:3306"
     volumes:

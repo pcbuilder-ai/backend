@@ -20,4 +20,5 @@ COPY . .
 ENV CHROME_BIN=/usr/bin/google-chrome
 ENV PATH="/usr/local/bin:$PATH"
 
-CMD ["python", "crawler.py"]
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
