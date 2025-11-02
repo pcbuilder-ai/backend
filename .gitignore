@@ -33,3 +33,4 @@ app/chroma/
 */chroma/
 **/chroma/
 **/chroma/**
+OPENAI_API_KEY.env

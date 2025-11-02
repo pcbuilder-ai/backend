@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MySQL User 테이블 정보</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #e6f3ff;
+        }
+        .password {
+            font-family: monospace;
+            font-size: 0.8em;
+            word-break: break-all;
+        }
+        .info-box {
+            background-color: #e7f3ff;
+            border: 1px solid #007bff;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 MySQL User 테이블 정보</h1>
+        
+        <div class="info-box">
+            <strong>📋 테이블 개요:</strong><br>
+            • 데이터베이스: project<br>
+            • 테이블명: user<br>
+            • 생성일: 2025-10-26<br>
+            • 현재 사용자 수: 1명
+        </div>
+
+        <h2>🏗️ 테이블 구조 (DESCRIBE user)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Type</th>
+                    <th>Null</th>
+                    <th>Key</th>
+                    <th>Default</th>
+                    <th>Extra</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>id</strong></td>
+                    <td>bigint</td>
+                    <td>NO</td>
+                    <td>PRI</td>
+                    <td>NULL</td>
+                    <td>auto_increment</td>
+                </tr>
+                <tr>
+                    <td><strong>username</strong></td>
+                    <td>varchar(255)</td>
+                    <td>NO</td>
+                    <td>UNI</td>
+                    <td>NULL</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td><strong>password</strong></td>
+                    <td>varchar(255)</td>
+                    <td>NO</td>
+                    <td></td>
+                    <td>NULL</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td><strong>role</strong></td>
+                    <td>varchar(255)</td>
+                    <td>YES</td>
+                    <td></td>
+                    <td>ROLE_USER</td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>👥 사용자 데이터 (SELECT * FROM user)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>사용자명</th>
+                    <th>암호화된 비밀번호</th>
+                    <th>역할</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td>testuser</td>
+                    <td class="password">$2a$10$jxQ9r4BDx722tnaeO2.bp.iyIHywpqFgvyPCd2NWP.8j7Y7lnBaEi</td>
+                    <td>ROLE_USER</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="info-box">
+            <strong>🔐 보안 정보:</strong><br>
+            • 비밀번호는 BCrypt로 암호화되어 있습니다<br>
+            • 사용자명은 고유값(UNIQUE)입니다<br>
+            • 기본 역할은 ROLE_USER입니다
+        </div>
+
+        <h2>📁 생성된 파일들</h2>
+        <ul>
+            <li><strong>user_table_structure.csv</strong> - 테이블 구조 정보</li>
+            <li><strong>user_data.csv</strong> - 사용자 데이터</li>
+            <li><strong>user_table_info.html</strong> - 이 HTML 파일</li>
+        </ul>
+    </div>
+</body>
+</html>
