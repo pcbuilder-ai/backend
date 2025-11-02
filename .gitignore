@@ -26,3 +26,7 @@ Thumbs.db
 # Docker
 *.pid
 *.sock
+<<<<<<< HEAD
+=======
+OPENAI_API_KEY.env
+>>>>>>> 0d8dc81 (back)
