@@ -9,63 +9,10 @@ def get_connection():
         host="db",        
         user="root",
         password="1234",
-<<<<<<< HEAD
-        database="project"
-=======
         database="project",
->>>>>>> 0d8dc81 (back)
         charset="utf8mb4",
         collation="utf8mb4_unicode_ci"
     )
-
-def get_latest_csv_path(data_dir="/app/data"):
-    csv_files = [f for f in os.listdir(data_dir) if f.endswith(".csv")]
-    if not csv_files:
-        raise FileNotFoundError("❌ CSV 파일이 없습니다.")
-    latest = max(csv_files, key=lambda f: os.path.getctime(os.path.join(data_dir, f)))
-    return os.path.join(data_dir, latest)
-
-def csv_to_db():
-    """가장 최신 CSV 파일을 DB로 적재"""
-    csv_path = get_latest_csv_path()
-    df = pd.read_csv(csv_path)
-
-    # 컬럼 정리
-    df.columns = [c.strip().lower() for c in df.columns]
-    if "price" in df.columns:
-        df["price"] = (
-            df["price"].astype(str)
-            .str.replace(",", "")
-            .str.extract("(\d+)", expand=False)
-            .fillna(0)
-            .astype(int)
-        )
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    for _, row in df.iterrows():
-        cursor.execute(
-            """
-            INSERT INTO product (name, category, spec, price, link, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE
-                price=VALUES(price),
-                updated_at=VALUES(updated_at)
-            """,
-            (
-                row.get("name"),
-                row.get("category"),
-                row.get("spec"),
-                int(row.get("price", 0)),
-                row.get("link"),
-                datetime.now(),
-            ),
-        )
-
-    conn.commit()
-    conn.close()
-    print(f"✅ {len(df)}개 제품을 '{os.path.basename(csv_path)}'에서 불러와 DB에 저장했습니다.")
 
 def get_hint_products(budget=None, purpose=None):
     conn = get_connection()

@@ -24,7 +24,10 @@ services:
       - "8001:8000"  # FastAPI 외부 노출 포트
     volumes:
       - ./back_py:/app
+      - ./data:/app/data
+      - ./chroma:/app/chroma
     environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - TZ=Asia/Seoul
     depends_on:
       db:

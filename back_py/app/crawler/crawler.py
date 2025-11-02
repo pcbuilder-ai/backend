@@ -1,15 +1,20 @@
 import time
 import csv
-import hashlib
+import os
 import re
-from datetime import datetime,timedelta
+import hashlib
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
+# ✅ DB & Vector utils
+from db_utils import save_to_mysql
+from vector_utils import save_to_vector_db
+
 
 # -----------------------
 # 설정
@@ -28,8 +33,7 @@ CONFIG = {
     "Cooler_Air": ("https://prod.danawa.com/list/?cate=11336857", 5),
 }
 
-KST = datetime.now()
-OUTPUT_CSV = f"./data/danawa{KST.strftime('%Y%m%d_%H%M%S')}.csv"
+OUTPUT_CSV = f"./data/danawa_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
 
 # -----------------------
@@ -49,57 +53,61 @@ def init_driver():
 # -----------------------
 # 유틸
 # -----------------------
-def stable_id_from_link(link: str) -> str:
-    return hashlib.sha256(link.encode("utf-8-sig")).hexdigest()[:16]
+
+def stable_id_from_link(link: str, category: str = "", capacity: str = "", name: str ="") -> str:
+    """링크 + 카테고리 + 용량을 조합해서 고유 ID 생성"""
+    if not capacity:
+        capacity = "N/A"
+    match = re.search(r"pcode=(\d+)",link)
+    pcode = match.group(1) if match else link
+    unique_key = f"{category}_{capacity}_{pcode}_{name}"
+    return hashlib.sha256(unique_key.encode("utf-8-sig")).hexdigest()[:16]
+
 
 
 def ensure_csv_header(path: str):
-    import os
-
+    """CSV 파일 생성 및 헤더 보장"""
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    header = ["id", "name", "price","capacity", "link", "category", "spec", "updated_at"]
-
+    header = ["id", "name", "price", "capacity", "link", "category", "spec", "updated_at"]
     if not os.path.exists(path):
         with open(path, "w", newline="", encoding="utf-8-sig") as f:
-            writer = csv.writer(f)
-            writer.writerow(header)
+            csv.writer(f).writerow(header)
 
 
-def append_rows_to_csv(path: str, rows: list[dict]):
-    with open(path, "a", newline="", encoding="utf-8-sig") as f:
+def append_to_csv(product: dict):
+    """한 줄씩 CSV 저장"""
+    with open(OUTPUT_CSV, "a", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
-        for r in rows:
-            writer.writerow(
-                [r.get(k, "") for k in ["id", "name", "price", "capacity", "link", "category", "spec","updated_at"]]
-            )
+        writer.writerow([
+            product.get("id"),
+            product.get("name"),
+            product.get("price"),
+            product.get("capacity"),
+            product.get("link"),
+            product.get("category"),
+            product.get("spec"),
+            product.get("updated_at")
+        ])
 
 
 def clean_capacity(category: str, raw_text: str):
-    """
-    용량 문자열 정제:
-    - RAM: 수량형, 벌크, 세트 제외
-    - HDD: 괄호 속 모델명 제거 (WD40EZAZ 등)
-    - 나머지 부품: 괄호 포함 그대로 반환 (예: 48GB(24Gx2))
-    """
+    """RAM/HDD 용량 정제"""
     if not raw_text:
         return ""
 
     text = raw_text.strip()
 
-    # RAM: 제외 단어 필터
+    # RAM: 수량형, 벌크 등 제외
     if category.upper().startswith("RAM"):
         skip_words = ["수량", "벌크", "세트", "패키지"]
         if any(word in text for word in skip_words):
             return ""
 
-    # HDD: 괄호 속 모델명 제거 (WD40EZAZ 등)
+    # HDD: 쉼표 뒤 모델명 제거
     if category.upper().startswith("HDD"):
         text = text.split(",")[0].strip()
-       
-    text = re.sub(r"\s+", " ", text).strip()
 
-    # 공백 정리
-    return text.strip()
+    return text
 
 # -----------------------
 # 크롤링 로직
@@ -108,9 +116,18 @@ def parse_products(driver, category: str, url: str, max_pages: int):
     results = []
 
     for page in range(1, max_pages + 1):
-        page_url = f"{url}&page={page}"
-        driver.get(page_url)
+        print(f"  🔹 {category} {page}페이지 크롤링 중...")
+        driver.get(url)
         time.sleep(2)
+
+        if page > 1:
+            try:
+                js_code = f"movePage({page});"
+                driver.execute_script(js_code)
+                time.sleep(2.5)  # 페이지 로딩 대기
+            except Exception as e:
+                print(f"⚠️ 페이지 이동 실패 (page={page}): {e}")
+                continue
 
         items = driver.find_elements(
             By.CSS_SELECTOR, "div.main_prodlist > ul.product_list > li.prod_item"
@@ -142,7 +159,7 @@ def parse_products(driver, category: str, url: str, max_pages: int):
                             raw_capacity = ""
                         capacity = clean_capacity(category, raw_capacity)
                         if not capacity:
-                            continue
+                            capacity="N/A"
                         try:
                             price_text = v.find_element(By.CSS_SELECTOR, "p.price_sect strong").text.strip()
                             price = int(price_text.replace(",", "").replace("원", ""))
@@ -155,7 +172,7 @@ def parse_products(driver, category: str, url: str, max_pages: int):
                             link = name_el.get_attribute("href")
 
                         results.append({
-                            "id": stable_id_from_link(link),
+                            "id": stable_id_from_link(link,category,capacity,f"{base_name} ({capacity})" if capacity else base_name),
                             "name": f"{base_name} ({capacity})" if capacity else base_name,
                             "price": price,
                             "capacity": capacity,
@@ -176,10 +193,10 @@ def parse_products(driver, category: str, url: str, max_pages: int):
                     link = name_el.get_attribute("href")
 
                     results.append({
-                        "id": stable_id_from_link(link),
+                        "id": stable_id_from_link(link,category,"N/A",base_name),
                         "name": base_name,
                         "price": price,
-                        "capacity": "",
+                        "capacity": "N/A",
                         "link": link,
                         "category": category,
                         "spec": spec_text,
@@ -193,21 +210,23 @@ def parse_products(driver, category: str, url: str, max_pages: int):
 
 
 # -----------------------
-# 메인
+# 메인 실행
 # -----------------------
 def main():
     driver = init_driver()
     ensure_csv_header(OUTPUT_CSV)
 
-    total = 0
     for category, (url, max_pages) in CONFIG.items():
-        print(f"▶ 카테고리: {category}")
+        print(f"\n▶ 카테고리: {category}")
         products = parse_products(driver, category, url, max_pages)
-        append_rows_to_csv(OUTPUT_CSV, products)
-        total += len(products)
+
+        for p in products:
+            append_to_csv(p)
+            save_to_mysql(p)
+        save_to_vector_db(products)
 
     driver.quit()
-    print(f"총 {total}개 상품 저장 완료 → {OUTPUT_CSV}")
+    print(f"\n✅ 모든 크롤링 및 저장 완료 → {OUTPUT_CSV}")
 
 
 if __name__ == "__main__":
