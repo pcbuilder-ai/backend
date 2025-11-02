@@ -11,3 +11,4 @@ python-dotenv
 # --- 데이터 처리 ---
 pandas
 mysql-connector-python
+chromadb

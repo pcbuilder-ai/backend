@@ -19,9 +19,11 @@ services:
       - "8001:8000"  # FastAPI 외부 노출 포트
     volumes:
       - ./back_py:/app
+      - ./data:/app/data
+      - ./chroma:/app/chroma
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - TZ = Asia/Seoul
+      - TZ=Asia/Seoul
     depends_on:
       - db
 
@@ -34,7 +36,6 @@ services:
     command: [
       "--character-set-server=utf8mb4",
       "--collation-server=utf8mb4_unicode_ci",
-      "--character-set-client-handshake=FALSE"
     ]
     ports:
       - "3306:3306"
