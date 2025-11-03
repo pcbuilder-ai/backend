@@ -1,8 +1,6 @@
 services:
   spring:
     build: ./pcproject
-    env_file:
-      - OPENAI_API_KEY.env
     ports:
       - "8081:8080"
     environment:
@@ -18,8 +16,6 @@ services:
   back_py:
     build: ./back_py
     container_name: back_py
-    env_file:
-      - OPENAI_API_KEY.env
     ports:
       - "8001:8000"  # FastAPI 외부 노출 포트
     volumes:
