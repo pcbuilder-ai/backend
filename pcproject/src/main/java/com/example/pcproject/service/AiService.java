@@ -2,111 +2,63 @@ package com.example.pcproject.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.web.client.RestTemplate;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class AiService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${openai.api.key:}")
-    private String openAiApiKey;
-
-    @Value("${openai.api.base:https://api.openai.com}")
-    private String openAiBaseUrl;
-
-    @Value("${openai.api.model:gpt-4o-mini}")
-    private String defaultModel;
-
-    @Value("${openai.org:}")
-    private String openAiOrg;
-
-    @Value("${openai.project:}")
-    private String openAiProject;
+    @Value("${fastapi.url:http://back_py:8000/ai/query}")
+    private String fastApiUrl;
 
     public Map<String, Object> chat(List<Map<String, String>> messages, String model, Integer maxTokens, Double temperature) {
-        if (openAiApiKey == null || openAiApiKey.isBlank()) {
-            return error("OPENAI_API_KEY is not configured.");
-        }
-
         try {
-            String url = openAiBaseUrl + "/v1/chat/completions";
-
+            // messages만 전달 (불필요한 파라미터 제거)
             Map<String, Object> payload = new HashMap<>();
-            payload.put("model", (model == null || model.isBlank()) ? defaultModel : model);
             payload.put("messages", messages);
-            if (maxTokens != null) payload.put("max_tokens", maxTokens);
-            if (temperature != null) payload.put("temperature", temperature);
 
-            String json = objectMapper.writeValueAsString(payload);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
 
-            HttpRequest.Builder builder = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(60))
-                    .header("Authorization", "Bearer " + openAiApiKey)
-                    .header("Content-Type", "application/json; charset=UTF-8");
+            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(payload, headers);
 
-            if (openAiOrg != null && !openAiOrg.isBlank()) {
-                builder.header("OpenAI-Organization", openAiOrg);
-            }
-            if (openAiProject != null && !openAiProject.isBlank()) {
-                builder.header("OpenAI-Project", openAiProject);
-            }
+            ResponseEntity<String> response = restTemplate.exchange(
+                    fastApiUrl,
+                    HttpMethod.POST,
+                    requestEntity,
+                    String.class
+            );
 
-            HttpRequest request = builder
-                    .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8))
-                    .build();
-
-            HttpClient client = HttpClient.newHttpClient();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-
-            if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                return objectMapper.readValue(response.body(), new TypeReference<Map<String, Object>>() {});
+            if (response.getStatusCode().is2xxSuccessful()) {
+                return objectMapper.readValue(response.getBody(), new TypeReference<Map<String, Object>>() {});
+            } else {
+                log.error("FastAPI error: {} - {}", response.getStatusCode(), response.getBody());
+                return Map.of(
+                        "success", false,
+                        "message", "FastAPI 응답 실패",
+                        "status", response.getStatusCodeValue(),
+                        "body", response.getBody()
+                );
             }
 
-            log.warn("OpenAI API error: status={}, body={}", response.statusCode(), response.body());
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("status", response.statusCode());
-            error.put("message", "OpenAI API request failed");
-            error.put("body", safeBody(response.body()));
-            return error;
         } catch (Exception e) {
-            log.error("OpenAI API call failed", e);
-            return error(e.getMessage());
-        }
-    }
-
-    private Map<String, Object> error(String message) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("success", false);
-        map.put("message", message);
-        return map;
-    }
-
-    private Object safeBody(String body) {
-        try {
-            return objectMapper.readValue(body, new TypeReference<Map<String, Object>>() {});
-        } catch (Exception ignore) {
-            return body;
+            log.error("FastAPI 호출 실패", e);
+            return Map.of(
+                    "success", false,
+                    "message", "FastAPI 호출 중 오류 발생",
+                    "detail", e.getMessage()
+            );
         }
     }
 }
-
-
-
