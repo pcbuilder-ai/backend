@@ -56,4 +56,30 @@ public class EstimateController {
                 "estimates", estimateService.getEstimatesByUser(userId)
         ));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteEstimate(@PathVariable Long id, HttpSession session) {
+        Long userId = (Long) session.getAttribute("user_id");
+
+        if (userId == null) {
+            return ResponseEntity.status(401).body(Map.of(
+                    "success", false,
+                    "message", "로그인이 필요합니다."
+            ));
+        }
+
+        boolean deleted = estimateService.deleteEstimate(id, userId);
+
+        if (deleted) {
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "견적이 삭제되었습니다."
+            ));
+        } else {
+            return ResponseEntity.status(403).body(Map.of(
+                    "success", false,
+                    "message", "삭제 권한이 없거나 견적이 존재하지 않습니다."
+            ));
+        }
+    }
 }

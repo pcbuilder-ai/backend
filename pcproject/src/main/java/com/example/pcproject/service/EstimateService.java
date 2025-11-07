@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -38,5 +39,20 @@ public class EstimateService {
     // ✅ 사용자별 견적 조회
     public List<Estimate> getEstimatesByUser(Long userId) {
         return estimateRepository.findByUserId(userId);
+    }
+
+    // ✅ 견적 삭제
+    public boolean deleteEstimate(Long id, Long userId) {
+        Optional<Estimate> estimateOpt = estimateRepository.findById(id);
+        if (estimateOpt.isEmpty()) return false;
+
+        Estimate estimate = estimateOpt.get();
+        if (!estimate.getUserId().equals(userId)) {
+            // 다른 사람 견적은 삭제 불가
+            return false;
+        }
+
+        estimateRepository.delete(estimate);
+        return true;
     }
 }
