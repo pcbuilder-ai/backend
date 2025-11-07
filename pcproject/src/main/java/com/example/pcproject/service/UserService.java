@@ -12,6 +12,7 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -93,5 +94,9 @@ public class UserService {
             System.err.println("--- [파일 저장 실패] user_data.txt 저장 중 오류 발생: " + e.getMessage());
             // 파일 저장 실패는 회원가입 자체를 실패시키지 않음 (DB에는 저장됨)
         }
+    }
+
+    public Optional<User> findById(Long id) {
+        return userRepository.findById(id);
     }
 }
