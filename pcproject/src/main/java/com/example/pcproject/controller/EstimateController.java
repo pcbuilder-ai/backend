@@ -18,6 +18,7 @@ public class EstimateController {
     @PostMapping("/save")
     public ResponseEntity<?> saveEstimate(@RequestBody Map<String, Object> req, HttpSession session) {
         Long userId = (Long) session.getAttribute("user_id");
+        System.out.println("🔥 [saveEstimate] userId = " + userId);
 
         if (userId == null) {
             return ResponseEntity.status(401).body(Map.of(
