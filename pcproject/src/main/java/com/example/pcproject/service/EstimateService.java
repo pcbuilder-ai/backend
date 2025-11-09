@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,9 +31,16 @@ public class EstimateService {
                 .title(title)
                 .totalPrice(totalPrice)
                 .data(jsonData)
+                .createdAt(LocalDateTime.now())
                 .build();
 
         estimateRepository.save(estimate);
+        System.out.println("💾 [DEBUG] Estimate 저장 직전 ----------------------------");
+        System.out.println("   userId     = " + estimate.getUserId());
+        System.out.println("   title      = " + estimate.getTitle());
+        System.out.println("   totalPrice = " + estimate.getTotalPrice());
+        System.out.println("   data len   = " + (estimate.getData() != null ? estimate.getData().length() : "null"));
+        System.out.println("----------------------------------------------------------");
         System.out.println("💾 DB에 견적 저장 완료 (user_id=" + userId + ")");
     }
 
