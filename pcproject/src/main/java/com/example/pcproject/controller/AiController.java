@@ -1,13 +1,12 @@
 package com.example.pcproject.controller;
 
 import com.example.pcproject.service.AiService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import java.util.HashMap;
-import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -17,25 +16,28 @@ public class AiController {
     private final AiService aiService;
 
     @PostMapping("/chat")
-    public ResponseEntity<?> chat(@RequestBody Map<String, Object> chatRequest) {
+    public ResponseEntity<?> chat(@RequestBody Map<String, Object> chatRequest, HttpServletRequest request) {
         try {
-            // ✅ messages 필드만 추출
-            @SuppressWarnings("unchecked")
-            List<Map<String, String>> messages = (List<Map<String, String>>) chatRequest.get("messages");
+            // ✅ 프론트에서 넘어온 "message" 값만 추출
+            String message = (String) chatRequest.get("message");
 
-            // ✅ [2주차 세션 기능 추가 대비]
-            // 지금은 없어도 되고, 나중에 프론트에서 session_id 같이 보내면 바로 활성화 가능
-            /*
-            String sessionId = (String) chatRequest.get("session_id");
-            Map<String, Object> result = aiService.chat(messages, sessionId);
-            */
+            if (message == null || message.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "message 필드가 비어 있습니다."
+                ));
+            }
 
-            // ✅ 현재 버전: 세션 없이 단순 messages만 전달
-            Map<String, Object> result = aiService.chat(messages);
+            // ✅ Spring 세션 ID 사용 (자동 생성 or 기존 유지)
+            String sessionId = request.getSession().getId();
+
+            // ✅ FastAPI로 요청 (message + sessionId 전달)
+            Map<String, Object> result = aiService.chat(message, sessionId);
 
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(500).body(Map.of(
                     "success", false,
                     "message", "AI 처리 중 오류가 발생했습니다.",
