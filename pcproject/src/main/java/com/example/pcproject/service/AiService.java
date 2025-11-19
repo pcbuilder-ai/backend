@@ -9,7 +9,6 @@ import org.springframework.http.*;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Service
@@ -19,28 +18,26 @@ public class AiService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestTemplate restTemplate = new RestTemplate();
 
-    // FastAPI 서버 주소 (도커 컨테이너명 back_py 기준)
+    // FastAPI 서버 주소 (컨테이너명 back_py 기준)
     @Value("${fastapi.url:http://back_py:8000/ai/query}")
     private String fastApiUrl;
 
     /**
-     * FastAPI에 messages (추후 session_id 포함) 전달하여 AI 응답을 받아옴
+     * FastAPI에 "현재 메시지"만 전달 (문맥은 Redis에서 관리)
      */
-    public Map<String, Object> chat(List<Map<String, String>> messages /*, String sessionId */) {
+    public Map<String, Object> chat(String message, String sessionId) {
         try {
             // ✅ FastAPI로 전달할 payload 구성
             Map<String, Object> payload = new HashMap<>();
-            payload.put("messages", messages);
-
-            /*
-            ✅ [2주차 세션 기능 추가 시 여기에 한 줄만 추가]
-            if (sessionId != null) {
-                payload.put("session_id", sessionId);
-            }
-            */
+            payload.put("message", message);  // 단일 메시지만 전달
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
+
+            // ✅ 세션 ID를 헤더로 전달
+            if (sessionId != null && !sessionId.isEmpty()) {
+                headers.set("session-id", sessionId);
+            }
 
             HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(payload, headers);
 
@@ -54,7 +51,10 @@ public class AiService {
 
             // ✅ 정상 응답 처리
             if (response.getStatusCode().is2xxSuccessful()) {
-                return objectMapper.readValue(response.getBody(), new TypeReference<Map<String, Object>>() {});
+                return objectMapper.readValue(
+                        response.getBody(),
+                        new TypeReference<Map<String, Object>>() {}
+                );
             } else {
                 log.error("FastAPI error: {} - {}", response.getStatusCode(), response.getBody());
                 return Map.of(

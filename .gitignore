@@ -1,36 +1,90 @@
+############################
 # Python
+############################
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+dist/
+build/
 
-# Virtual environment
+############################
+# Python Virtual Environment
+############################
 venv/
 .env
 .env.*
 
-# Data
-app/data/
-db/
-*.csv
 
-# Logs
+############################
+# FastAPI / Data
+############################
+app/data/
+*.csv
 *.log
 
-# IDE / OS
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
 
-# Docker
-*.pid
-*.sock
+############################
+# Node / React (Front)
+############################
+node_modules/
+build/
+dist/
 
+
+############################
+# Spring Boot (Java)
+############################
+target/
+*.jar
+*.war
+*.iml
+
+
+############################
+# MySQL / DB
+############################
+db/
+mysql/
+*.sql
+
+
+############################
+# Redis (Docker Volume)
+############################
+redis_data/
+*.rdb
+*.aof
+*.conf
+
+
+############################
 # Vector DB (Chroma)
+############################
 chroma/
 app/chroma/
 */chroma/
 **/chroma/
 **/chroma/**
+
+
+############################
+# Docker Runtime Files
+############################
+*.pid
+*.sock
+
+
+############################
+# OS / IDE
+############################
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+
+############################
+# Secret Keys
+############################
 OPENAI_API_KEY.env

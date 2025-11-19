@@ -12,6 +12,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      back_py:
+        condition: service_started
 
   back_py:
     build: ./back_py
@@ -27,6 +29,8 @@ services:
       - TZ=Asia/Seoul
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   db:
@@ -49,3 +53,24 @@ services:
       - "3306:3306"
     volumes:
       - ./db:/var/lib/mysql
+
+  redis:
+    image: redis:7.4
+    container_name: redis
+    command: >
+      sh -c "redis-server
+             --appendonly yes         
+             --save ''               
+             --maxmemory 512mb         
+             --maxmemory-policy allkeys-lru  
+             --protected-mode no"      
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: always
