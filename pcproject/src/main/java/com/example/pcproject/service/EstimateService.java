@@ -1,21 +1,26 @@
 package com.example.pcproject.service;
 
 import com.example.pcproject.domain.Estimate;
+import com.example.pcproject.domain.User;
 import com.example.pcproject.repository.EstimateRepository;
+import com.example.pcproject.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class EstimateService {
 
     private final EstimateRepository estimateRepository;
+    private final UserRepository userRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // ✅ 견적 저장
@@ -47,6 +52,32 @@ public class EstimateService {
     // ✅ 사용자별 견적 조회
     public List<Estimate> getEstimatesByUser(Long userId) {
         return estimateRepository.findByUserId(userId);
+    }
+
+    // ✅ 모든 견적 조회 (갤러리용)
+    public List<Map<String, Object>> getAllEstimates() {
+        List<Estimate> estimates = estimateRepository.findAll();
+        
+        return estimates.stream().map(estimate -> {
+            Map<String, Object> result = new HashMap<>();
+            result.put("id", estimate.getId());
+            result.put("title", estimate.getTitle());
+            result.put("totalPrice", estimate.getTotalPrice());
+            result.put("data", estimate.getData());
+            result.put("createdAt", estimate.getCreatedAt());
+            
+            // 사용자 정보 추가
+            Optional<User> userOpt = userRepository.findById(estimate.getUserId());
+            if (userOpt.isPresent()) {
+                User user = userOpt.get();
+                result.put("username", user.getName()); // 사용자 이름
+                result.put("userId", user.getId());
+            } else {
+                result.put("username", "알 수 없음");
+            }
+            
+            return result;
+        }).collect(Collectors.toList());
     }
 
     // ✅ 견적 삭제
