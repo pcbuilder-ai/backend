@@ -58,6 +58,14 @@ public class EstimateController {
         ));
     }
 
+    @GetMapping("/all")
+    public ResponseEntity<?> getAllEstimates() {
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "estimates", estimateService.getAllEstimates()
+        ));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteEstimate(@PathVariable Long id, HttpSession session) {
         Long userId = (Long) session.getAttribute("user_id");
